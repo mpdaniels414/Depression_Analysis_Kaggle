@@ -1,0 +1,124 @@
+---
+title: "Depression Professional Analysis - Michael Daniels"
+Date: November 22, 2024
+output: html_notebook
+---
+
+
+```{r}
+
+set.seed(100)
+depression_dataset <- read.csv("Depression Professional Dataset.csv", header = TRUE, na.strings =  "")
+
+depression_dataset$Gender = as.factor(depression_dataset$Gender)
+depression_dataset$Work.Pressure = as.factor(depression_dataset$Work.Pressure)
+depression_dataset$Job.Satisfaction = as.factor(depression_dataset$Job.Satisfaction)
+depression_dataset$Dietary.Habits = as.factor(depression_dataset$Dietary.Habits)
+depression_dataset$Have.you.ever.had.suicidal.thoughts..= as.factor(depression_dataset$Have.you.ever.had.suicidal.thoughts..)
+depression_dataset$Financial.Stress = as.factor(depression_dataset$Financial.Stress)
+depression_dataset$Family.History.of.Mental.Illness = as.factor(depression_dataset$Family.History.of.Mental.Illness)
+
+depression_dataset$Depression = as.factor(ifelse(depression_dataset$Depression == "No", 0, 1))
+
+#Dividing the dataset into training and testing datasets
+testRows = sample(nrow(depression_dataset),0.2*nrow(depression_dataset))
+testData = depression_dataset[testRows, ]
+trainData = depression_dataset[-testRows, ]
+row.names(trainData) <- NULL
+head(trainData) #display train data
+```
+
+
+EDA and Boxplots of quantitative factors (Age and Hours worked a week):
+
+```{r}
+library(ggplot2)
+
+boxplot(
+  Age~Depression,
+  main = "",
+  xlab = "Depression",
+  ylab = "Age of individual", 
+  col = blues9,
+  data = depression_dataset
+)
+```
+
+```{r}
+
+```
+
+
+```{r}
+boxplot(
+  Work.Hours~Depression,
+  main = "",
+  xlab = "Depression",
+  ylab = "Hours worked", 
+  col = blues9,
+  data = depression_dataset
+)
+```
+
+```{r}
+library(caret)
+
+model2 <- caret::train(Depression ~., 
+                       data = trainData,
+                       method = "rpart",
+                       trControl = trainControl(method = "cv", number = 3),
+                       metric = "Accuracy"
+)
+print(model2)
+```
+
+```{r}
+model3 <- caret::train(Depression ~., 
+                       data = trainData,
+                       method = "rf",
+                       trControl = trainControl(method = "cv", number = 3),
+                       metric = "Accuracy"
+)
+print(model3)
+```
+```{r}
+mean_model2 <- round(mean(model2$resample$Accuracy)*100, digits = 2)
+mean_model3 <- round(mean(model3$resample$Accuracy)*100, digits = 2)
+
+print(paste("The mean of accuracy model 2 is:", mean_model2, "and the mean accuracy of model 3 is:", mean_model3))
+``` 
+
+```{r}
+predict_model2 <- predict(model2, newdata = testData, type = "prob")
+predict_model3 <- predict(model3, newdata = testData, type = "prob")
+```
+
+```{r}
+predClass.model2 = ifelse(predict_model2[,2] >= 0.5, 1, 0)
+predClass.model3 = ifelse(predict_model3[,2] >= 0.5, 1, 0)
+
+predictions_df <- data.frame(
+  Actual=testData$Depression,
+  DecisionTree = predClass.model2,
+  Randomforest=predClass.model3
+)
+
+print(head(predictions_df,10))
+```
+
+```{r}
+pred_metrics = function(modelName, actualClass, predClass) {
+  cat(modelName, '\n')
+  conmat <- confusionMatrix(table(actualClass, predClass))
+  c(conmat$overall["Accuracy"], conmat$byClass["Sensitivity"],
+    conmat$byClass["Specificity"])
+}
+
+pred_metrics("Decision tree model", predictions_df$Actual, predictions_df$DecisionTree)
+```
+
+
+```{r}
+pred_metrics("Random Forest Model", testData$Depression, predictions_df$Randomforest)
+```
+
