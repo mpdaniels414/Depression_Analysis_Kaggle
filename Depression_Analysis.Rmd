@@ -1,0 +1,631 @@
+---
+title: "Depression Professional Analysis - Michael Daniels"
+Date: November 22, 2024
+output: html_notebook
+---
+
+
+```{r}
+
+set.seed(100)
+depression_dataset <- read.csv("Depression Professional Dataset.csv", header = TRUE, na.strings =  "")
+
+
+depression_dataset$Gender = as.factor(depression_dataset$Gender)
+depression_dataset$Work.Pressure = as.factor(depression_dataset$Work.Pressure)
+depression_dataset$Job.Satisfaction = as.factor(depression_dataset$Job.Satisfaction)
+depression_dataset$Sleep.Duration = as.factor(depression_dataset$Sleep.Duration)
+depression_dataset$Dietary.Habits = as.factor(depression_dataset$Dietary.Habits)
+depression_dataset$Have.you.ever.had.suicidal.thoughts..= as.factor(depression_dataset$Have.you.ever.had.suicidal.thoughts..)
+depression_dataset$Financial.Stress = as.factor(depression_dataset$Financial.Stress)
+depression_dataset$Family.History.of.Mental.Illness = as.factor(depression_dataset$Family.History.of.Mental.Illness)
+
+depression_dataset$Depression = as.factor(ifelse(depression_dataset$Depression == "No", 0, 1))
+
+#Dividing the dataset into training and testing datasets
+testRows = sample(nrow(depression_dataset),0.2*nrow(depression_dataset))
+testData = depression_dataset[testRows, ]
+trainData = depression_dataset[-testRows, ]
+row.names(trainData) <- NULL
+head(trainData) #display train data
+```
+
+
+EDA and Boxplots of quantitative factors (Age and Hours worked a week):
+
+```{r}
+library(ggplot2)
+
+boxplot(
+  Age~Depression,
+  main = "",
+  xlab = "Depression",
+  ylab = "Age of individual", 
+  col = blues9,
+  data = depression_dataset
+)
+```
+
+
+```{r}
+boxplot(
+  Work.Hours~Depression,
+  main = "",
+  xlab = "Depression",
+  ylab = "Hours worked", 
+  col = blues9,
+  data = depression_dataset
+)
+```
+
+
+```{r}
+library(ggplot2)
+
+# Gender vs Depression
+ggplot(depression_dataset, aes(x = Gender, fill = as.factor(Depression))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("blue", "red"), labels = c("No Depression", "Depression")) +
+  labs(title = "Gender vs Depression", x = "Gender", y = "Proportion", fill = "Depression") +
+  theme_minimal()
+
+# Work Pressure vs Depression
+ggplot(depression_dataset, aes(x = Work.Pressure, fill = as.factor(Depression))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("blue", "red"), labels = c("No Depression", "Depression")) +
+  labs(title = "Work Pressure vs Depression", x = "Work Pressure", y = "Proportion", fill = "Depression") +
+  theme_minimal()
+
+# Job Satisfaction vs Depression
+ggplot(depression_dataset, aes(x = Job.Satisfaction, fill = as.factor(Depression))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("blue", "red"), labels = c("No Depression", "Depression")) +
+  labs(title = "Job Satisfaction vs Depression", x = "Job Satisfaction", y = "Proportion", fill = "Depression") +
+  theme_minimal()
+
+# Sleep Duration vs Depression
+ggplot(depression_dataset, aes(x = Sleep.Duration, fill = as.factor(Depression))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("blue", "red"), labels = c("No Depression", "Depression")) +
+  labs(title = "Sleep Duration vs Depression", x = "Sleep Duration", y = "Proportion", fill = "Depression") +
+  theme_minimal()
+
+# Dietary Habits vs Depression
+ggplot(depression_dataset, aes(x = Dietary.Habits, fill = as.factor(Depression))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("blue", "red"), labels = c("No Depression", "Depression")) +
+  labs(title = "Dietary Habits vs Depression", x = "Dietary Habits", y = "Proportion", fill = "Depression") +
+  theme_minimal()
+
+# Suicidal Thoughts vs Depression
+ggplot(depression_dataset, aes(x = Have.you.ever.had.suicidal.thoughts.., fill = as.factor(Depression))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("blue", "red"), labels = c("No Depression", "Depression")) +
+  labs(title = "Suicidal Thoughts vs Depression", x = "Suicidal Thoughts", y = "Proportion", fill = "Depression") +
+  theme_minimal()
+
+# Financial Stress vs Depression
+ggplot(depression_dataset, aes(x = Financial.Stress, fill = as.factor(Depression))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("blue", "red"), labels = c("No Depression", "Depression")) +
+  labs(title = "Financial Stress vs Depression", x = "Financial Stress", y = "Proportion", fill = "Depression") +
+  theme_minimal()
+
+# Family History of Mental Illness vs Depression
+ggplot(depression_dataset, aes(x = Family.History.of.Mental.Illness, fill = as.factor(Depression))) +
+  geom_bar(position = "fill") +
+  scale_fill_manual(values = c("blue", "red"), labels = c("No Depression", "Depression")) +
+  labs(title = "Family History of Mental Illness vs Depression", x = "Family History", y = "Proportion", fill = "Depression") +
+  theme_minimal()
+```
+
+
+
+Creation of the basic full model
+
+```{r}
+# Create a full GLM model using all predictors
+full_model <- glm(Depression ~ ., data = trainData, family = binomial)
+# Display the summary of the model
+summary(full_model)
+```
+
+Let's explore this error present.  Warning: glm.fit: algorithm did not convergeWarning: glm.fit: fitted probabilities numerically 0 or 1 occurred
+
+
+```{r}
+library(car)
+
+vif(full_model)
+```
+
+Stepwise Regression (Forward, backward, forward/backward)
+
+```{r}
+library(flexmix)
+library(stats)
+
+
+# Fit the minimum model (intercept-only model)
+minimum_model <- glm(Depression ~ 1, data = trainData, family = 'binomial')
+
+
+stepwise_forward <- step(minimum_model, scope = list(lower = minimum_model, upper = full_model), direction = "forward")
+```
+
+```{r}
+summary_forward_stepwise <- summary(stepwise_forward)
+AIC_forward_stepwise <- AIC(stepwise_forward, k=2)
+BIC_forward_stepwise <- AIC(stepwise_forward, k=log(nrow(trainData)))
+
+summary_forward_stepwise
+AIC_forward_stepwise
+BIC_forward_stepwise
+```
+
+```{r}
+stepwise_backward <- step(full_model, scope = list(lower = minimum_model, upper = full_model), direction = "backward")
+summary_backward_stepwise <- summary(stepwise_backward)
+AIC_backward_stepwise <- AIC(stepwise_backward, k=2)
+BIC_backward_stepwise <- AIC(stepwise_backward, k=log(nrow(trainData)))
+
+summary_backward_stepwise
+```
+
+```{r}
+stepwise_forward_backward <- step(minimum_model, scope = list(lower = minimum_model, upper = full_model), direction = "both") 
+```
+
+```{r}
+summary_forward_backward_stepwise <- summary(stepwise_forward_backward)
+AIC_forward_backward_stepwise <- AIC(stepwise_forward_backward, k=2)
+BIC_forward_backward_stepwise <- AIC(stepwise_forward_backward, k=log(nrow(trainData)))
+
+summary_forward_backward_stepwise
+AIC_forward_backward_stepwise
+BIC_forward_backward_stepwise
+```
+
+
+```{r}
+anova(full_model,stepwise_forward_backward, test = "Chisq")
+```
+
+Note that the F test here is .9998 which is much larger than any alpha parameter, indicating that we do not reject the null hypothesis corresponding to the reduced model. Thus, we conclude that the reduced model created from forward/backward stepwise regression plausibly performs similarly in terms of explanatory power as the full model. To continue, we should seek out regularization regression formulas that will help with the overprediction demonstrated in the model above.  (Particularly regularization)  
+
+Regularization Techniques (Ridge, Lasso, Elastic)
+
+Starting with Ridge:
+
+```{r}
+numeric_cols <- sapply(trainData, is.numeric)
+numeric_cols_names <- names(trainData)[numeric_cols]
+
+# Scale training data
+scale_data_train <- trainData
+scale_data_train[numeric_cols] <- scale(scale_data_train[numeric_cols])
+
+# Scale test data
+scale_data_test <- testData
+scale_data_test[numeric_cols] <- scale(scale_data_test[numeric_cols])
+
+# Create model matrices
+x_train <- model.matrix(Depression ~ ., scale_data_train)[,-1]
+y_train <- scale_data_train$Depression
+x_test <- model.matrix(Depression ~ ., scale_data_test)[,-1]
+y_test <- scale_data_test$Depression
+
+# Print dimensions to verify
+print("Training data dimensions:")
+print(dim(x_train))
+print("Testing data dimensions:")
+print(dim(x_test))
+```
+
+```{r}
+library(glmnet)
+set.seed(100)
+cv_ridge <- cv.glmnet(x_train, y_train, alpha = 0, family = "binomial", nfolds = 10)
+
+# Get optimal lambda
+optimal_lambda <- cv_ridge$lambda.min
+print("Optimal lambda from cross-validation:")
+print(optimal_lambda)
+ridge_model <- glmnet(x_train, y_train, alpha = 0, family = "binomial", lambda = optimal_lambda)
+```
+```{r}
+ridge_model_100 <- glmnet(x_train, y_train, alpha = 0, family = "binomial", nlambda = 100)
+
+# Extract coefficients at optimal lambda
+ridge_coef <- coef(ridge_model_100, s = optimal_lambda_ridge)
+
+# Convert to a more readable format
+ridge_coef_df <- data.frame(
+    Variable = rownames(ridge_coef),
+    Coefficient = as.vector(ridge_coef)
+)
+
+ridge_coef_df <- ridge_coef_df[ridge_coef_df$Coefficient != 0, ]
+ridge_coef_df <- ridge_coef_df[order(abs(ridge_coef_df$Coefficient), decreasing = TRUE), ]
+
+# Print coefficients
+print("Ridge Regression Coefficients (sorted by absolute value):")
+print(ridge_coef_df[,'Variable'])
+```
+
+```{r}
+plot(ridge_model_100, xvar = "lambda", label = TRUE, lwd = 2)
+abline(v = log(optimal_lambda_ridge), col = 'red', lty = 2, lwd = 2)
+```
+```{r}
+coef(ridge_model_100, s = optimal_lambda_ridge)
+```
+Now onto Lasso:
+
+```{r}
+numeric_cols <- sapply(trainData, is.numeric)
+numeric_cols <- names(trainData)[numeric_cols]
+
+scale_data_train <- trainData
+scale_data_train[numeric_cols] <- scale(trainData[numeric_cols])
+
+x_train_lasso <- model.matrix(Depression ~ ., scale_data_train)[,-1]  # Remove intercept
+y_train_lasso <- trainData$Depression
+
+
+set.seed(100)
+lasso_model <- cv.glmnet(x_train_lasso, y_train_lasso, alpha = 1, family = "binomial", nfolds = 10, type.measure = "deviance")
+
+# Get the optimal lambda
+optimal_lambda_lasso <- lasso_model$lambda.min
+
+print(paste("Optimal lambda for Lasso regression:", round(optimal_lambda_lasso, 4)))
+```
+```{r}
+# Fit Lasso regression with 100 lambda values
+lasso_model_100 <- glmnet(x_train_lasso, y_train_lasso, alpha = 1, family = "binomial", nlambda = 100)
+
+# Extract coefficients at optimal lambda
+lasso_coef <- coef(lasso_model_100, s = optimal_lambda_lasso)
+
+# Convert to a more readable format
+lasso_coef_df <- data.frame(
+    Variable = rownames(lasso_coef),
+    Coefficient = as.vector(lasso_coef)
+)
+
+# Remove coefficients that are exactly zero (if any) and sort by absolute value
+lasso_coef_df <- lasso_coef_df[lasso_coef_df$Coefficient != 0, ]
+lasso_coef_df <- lasso_coef_df[order(abs(lasso_coef_df$Coefficient), decreasing = TRUE), ]
+
+# Print coefficients
+print("Lasso Regression Coefficients (sorted by absolute value):")
+print(lasso_coef_df[,'Variable'])
+```
+```{r}
+plot(lasso_model_100, xvar = "lambda", label = TRUE, lwd = 2)
+abline(v=log(optimal_lambda_lasso), col='red', lty = 2, lwd=2)
+```
+
+```{r}
+lasso_coefficients <- as.matrix(coef(lasso_model, s = optimal_lambda_lasso))
+
+# Identify coefficients that are shrunk to zero
+zero_coefficients <- rownames(lasso_coefficients)[lasso_coefficients == 0]
+
+# Print the coefficients that are shrunk to zero
+cat("Coefficients shrunk to zero at optimal lambda:", zero_coefficients)
+```
+It is interesting to note here that none of the coefficients shrunk to zero in this dataset.  
+
+Moving onto Elastic Net
+
+```{r}
+set.seed(100)
+elastic_net_model <- cv.glmnet(x_train_lasso, y_train_lasso, alpha = 0.5, family = "binomial", nfolds = 10, type.measure = "deviance")
+
+# Get the optimal lambda
+optimal_lambda_elastic_net <- elastic_net_model$lambda.min
+
+print(paste("Optimal lambda for Elastic Net regression:", round(optimal_lambda_elastic_net, 4)))
+```
+```{r}
+elastic_net_model_100 <- glmnet(x_train_lasso, y_train_lasso, alpha = 0.5, family = "binomial", nlambda = 100)
+
+# Extract coefficients at optimal lambda
+elastic_net_coef <- coef(elastic_net_model_100, s = optimal_lambda_elastic_net)
+
+# Convert to a more readable format
+elastic_net_coef_df <- data.frame(
+    Variable = rownames(elastic_net_coef),
+    Coefficient = as.vector(elastic_net_coef)
+)
+
+# Remove coefficients that are exactly zero (if any) and sort by absolute value
+elastic_net_coef_df <- elastic_net_coef_df[elastic_net_coef_df$Coefficient != 0, ]
+elastic_net_coef_df <- elastic_net_coef_df[order(abs(elastic_net_coef_df$Coefficient), decreasing = TRUE), ]
+
+# Print coefficients
+print("Elastic Net Regression Coefficients (sorted by absolute value):")
+print(elastic_net_coef_df[,'Variable'])
+```
+```{r}
+plot(elastic_net_model_100, xvar = "lambda", label = TRUE, lwd = 2)
+abline(v=log(optimal_lambda_elastic_net), col='red', lty = 2, lwd=2)
+```
+```{r}
+# Extract coefficients at the optimal lambda
+elastic_net_coefficients <- as.matrix(coef(elastic_net_model, s = optimal_lambda_elastic_net))
+
+# Identify coefficients that are shrunk to zero
+zero_coefficients <- rownames(elastic_net_coefficients)[elastic_net_coefficients == 0]
+
+# Print the coefficients that are shrunk to zero
+cat("Coefficients shrunk to zero at optimal lambda:", zero_coefficients)
+```
+
+
+Creation of basic DecisionTree and RandomForest Models
+
+```{r}
+library(caret)
+
+DecisionTree <- caret::train(Depression ~., 
+                       data = trainData,
+                       method = "rpart",
+                       trControl = trainControl(method = "cv", number = 3),
+                       metric = "Accuracy"
+)
+print(DecisionTree)
+```
+
+
+```{r}
+RandomForest <- caret::train(Depression ~., 
+                       data = trainData,
+                       method = "rf",
+                       trControl = trainControl(method = "cv", number = 3),
+                       metric = "Accuracy"
+)
+print(RandomForest)
+```
+
+```{r}
+mean_DecisionTree <- round(mean(DecisionTree$resample$Accuracy)*100, digits = 2)
+mean_RandomForest <- round(mean(RandomForest$resample$Accuracy)*100, digits = 2)
+
+print(paste("The mean of accuracy the decision tree model is:", mean_DecisionTree, "and the mean accuracy of random forest model is:", mean_RandomForest))
+``` 
+
+Creating an XGBoost model: 
+
+```{r}
+library(xgboost)
+train_matrix <- xgb.DMatrix(data = x_train, label = as.numeric(y_train)-1)
+test_matrix <- xgb.DMatrix(data = x_test, label = as.numeric(y_test)-1)
+
+# Set parameters for XGBoost
+params <- list(
+  booster = "gbtree",
+  objective = "binary:logistic",
+  eval_metric = "auc",
+  eta = 0.1,
+  max_depth = 6,
+  min_child_weight = 1,
+  subsample = 0.8,
+  colsample_bytree = 0.8
+)
+
+# Perform cross-validation to find the best number of rounds
+set.seed(123)
+cv <- xgb.cv(
+  params = params,
+  data = train_matrix,
+  nrounds = 100,
+  nfold = 5,
+  showsd = TRUE,
+  stratified = TRUE,
+  print_every_n = 10,
+  early_stopping_rounds = 10,
+  maximize = TRUE
+)
+
+# Train the XGBoost model using the best number of rounds
+best_nrounds <- cv$best_iteration
+xgb_model <- xgb.train(
+  params = params,
+  data = train_matrix,
+  nrounds = best_nrounds
+)
+```
+
+
+
+Now testing the accuracy of the functions using test data.  
+
+
+```{r}
+predict_model1 <- predict(full_model, newdata = testData, type = 'response')
+predict_model2 <- predict(DecisionTree, newdata = testData, type = "prob")
+predict_model3 <- predict(RandomForest, newdata = testData, type = "prob")
+predict_model4 <- predict(stepwise_forward, newdata = testData, type = 'response')
+predict_model5 <- predict(stepwise_backward, newdata = testData, type = 'response')
+predict_model6 <- predict(stepwise_forward_backward, newdata = testData, type = 'response')
+predict_model7 <- predict(ridge_model, newx = x_test,s = optimal_lambda_ridge,type = "response")
+```
+
+```{r}
+lasso_coef <- coef(lasso_model, s = "lambda.min")
+index_lasso <- which(lasso_coef != 0)
+
+# Create training data with only LASSO-selected predictors
+x_train_selected <- x_train_lasso[, index_lasso[-1]-1]  # Remove intercept index
+lasso_predictors <- as.data.frame(x_train_selected)
+
+# Retrain using logistic regression with selected predictors
+lasso_retrained <- glm(y_train_lasso ~ ., family = "binomial", data = lasso_predictors)
+
+# Create test data with same selected predictors
+x_test_lasso <- model.matrix(Depression ~ ., scale_data_test)[,-1]  # Remove intercept
+new_test <- x_test_lasso[, index_lasso[-1]-1]  # Remove intercept index
+new_test_df <- as.data.frame(new_test)
+
+# Get predictions
+predict_model8 <- predict(lasso_retrained, newdata = new_test_df, type = "response")
+```
+```{r}
+x_test_elnet <- model.matrix(Depression ~ ., scale_data_test)[,-1]
+
+# Get elastic net coefficients
+elastic_coef <- coef(elastic_net_model, s = optimal_lambda_elastic_net)
+
+# Get predictions using the elastic net model
+predict_model9 <- predict(elastic_net_model, newx = x_test_elnet,
+                         s = optimal_lambda_elastic_net,
+                         type = "response")
+```
+
+```{r}
+predict_model10 <- predict(xgb_model, newdata = x_test)
+```
+
+
+```{r}
+# Calculate mean probabilities
+mean_probs <- c(
+  mean(predict_model1),
+  mean(predict_model2[, 2]),
+  mean(predict_model3[, 2]),
+  mean(predict_model4),
+  mean(predict_model5),
+  mean(predict_model6),
+  mean(predict_model7),
+  mean(predict_model8),
+  mean(predict_model9),
+  mean(predict_model10)
+)
+
+names(mean_probs) <- c("Full Logistic Regression", "Decision Tree","Random Forest","Stepwise Forward", 
+                      "Stepwise Backward", "Stepwise Forward-Backward", "Ridge Regression", "Regular Lasso", "Elastic Net", "XGBoost")
+
+# Create a data frame with model names and their corresponding probabilities
+mean_probs_df <- data.frame(
+    Model = names(mean_probs),
+    Average_Probability = mean_probs
+)
+
+# Print the results
+print(mean_probs_df)
+```
+
+
+```{r}
+# Redefine classification objects using the predicted probabilities
+final_predictions <- data.frame(
+    Actual = testData$Depression,  # Changed from RemoteWorkPreference to Depression
+    "Full_Logistic" = ifelse(predict_model1 >= 0.3, 1, 0),
+    "Decision_Tree" = ifelse(predict_model2[,2] >= 0.3, 1, 0),
+    "Random_Forest" = ifelse(predict_model3[,2] >= 0.3, 1, 0),
+    "Step_Forward" = ifelse(predict_model4 >= 0.3, 1, 0),
+    "Step_Backward" = ifelse(predict_model5 >= 0.3, 1, 0),
+    "Step_Both" = ifelse(predict_model6 >= 0.3, 1, 0),
+    "Ridge" = ifelse(as.vector(predict_model7) >= 0.3, 1, 0),
+    "Lasso" = ifelse(as.vector(predict_model8) >= 0.3, 1, 0),
+    "Elastic Net" = ifelse(as.vector(predict_model9) >= 0.3, 1, 0),
+    "XGBoost" = ifelse(predict_model10 >= 0.3, 1, 0)
+)
+
+print(tail(final_predictions, 10))
+```
+
+
+```{r}
+library(caret)
+
+#Create function to calculate the metrics
+pred_metrics = function(modelName, actualClass, predClass) {
+  cat(modelName, '\n')
+  conmat <- confusionMatrix(table(actualClass, predClass))
+  c(conmat$overall["Accuracy"], conmat$byClass["Sensitivity"],
+    conmat$byClass["Specificity"])
+}
+
+# Calculate metrics for each model
+metrics_list <- list(
+  Full_Logistic = pred_metrics("Full Logistic", testData$Depression, ifelse(predict_model1 >= 0.3, 1, 0)),
+  Decision_Tree = pred_metrics("Decision Tree", testData$Depression, ifelse(predict_model2[,2] >= 0.3, 1, 0)),
+  Random_Forest = pred_metrics("Decision Tree", testData$Depression, ifelse(predict_model3[,2] >= 0.3, 1, 0)),
+  Step_Forward = pred_metrics("Step Forward", testData$Depression, ifelse(predict_model4 >= 0.3, 1, 0)),
+  Step_Backward = pred_metrics("Step Backward", testData$Depression, ifelse(predict_model5 >= 0.3, 1, 0)),
+  Step_Both = pred_metrics("Step Both", testData$Depression, ifelse(predict_model6 >= 0.3, 1, 0)),
+  Ridge = pred_metrics("Ridge", testData$Depression, ifelse(as.vector(predict_model7) >= 0.3, 1, 0)),
+  Reg_Lasso = pred_metrics("Regular Lasso", testData$Depression, ifelse(as.vector(predict_model8) >= 0.3, 1, 0)),
+  Elastic_Net = pred_metrics("Elastic Net", testData$Depression, ifelse(as.vector(predict_model9) >= 0.3, 1, 0)),
+  XGBoost = pred_metrics("XGBoost", testData$Depression, ifelse(as.vector(predict_model10) >= 0.3, 1, 0))
+)
+
+metrics_df <- do.call(rbind, metrics_list)
+
+# Print the metrics for all models
+print("Classification Evaluation Metrics for All Models:")
+
+print(metrics_df)
+```
+### Model Evaluation and Interpretation
+
+The table below summarizes the evaluation metrics (Accuracy, Sensitivity, Specificity) for all models tested:
+
+| **Model**          | **Accuracy** | **Sensitivity** | **Specificity** | **Observations** |
+|---------------------|--------------|------------------|------------------|-------------------|
+| **Full Logistic**   | 0.9902       | 0.9918           | 0.9773           | High Accuracy and well-balanced Sensitivity and Specificity. |
+| **Decision Tree**   | 0.9220       | 0.9560           | 0.6522           | High Sensitivity but low Specificity, suggesting overfitting. |
+| **Random Forest**   | 0.9390       | 0.9721           | 0.7059           | Strong Sensitivity but moderate Specificity; likely overfitting. |
+| **Step Forward**    | 0.9878       | 0.9891           | 0.9767           | High performance and well-balanced metrics. |
+| **Step Backward**   | 0.9878       | 0.9891           | 0.9767           | Similar performance to Step Forward. |
+| **Step Both**       | 0.9878       | 0.9891           | 0.9767           | Identical to Step Forward and Step Backward. |
+| **Ridge**           | 0.9780       | 0.9837           | 0.9302           | Strong performance with better balance than Random Forest. |
+| **Regular Lasso**   | 0.9854       | 0.9864           | 0.9762           | High Accuracy with sparsity in predictors. |
+| **Elastic Net**     | 0.9902       | 0.9891           | 1.0000           | Excellent Specificity, slightly lower Sensitivity than Full Logistic. |
+| **XGBoost**         | 0.9610       | 0.9754           | 0.8409           | High Accuracy and Sensitivity, but Specificity is lower. |
+
+---
+
+### Interpretation
+
+1. **Best Overall Model**:
+   - **Elastic Net** achieves the highest performance with perfect Specificity (1.0000), high Accuracy (0.9902), and strong Sensitivity (0.9891). It is ideal if minimizing false positives is critical.
+
+2. **If Accuracy is the Priority**:
+   - **Full Logistic Regression** and **Elastic Net** perform equally well, achieving an Accuracy of 0.9902. Both models also balance Sensitivity and Specificity effectively.
+
+3. **If Sensitivity is Critical**:
+   - **Full Logistic Regression** (Sensitivity: 0.9918) is the best choice for correctly identifying positive cases (e.g., depression detection).
+
+4. **If Specificity is Critical**:
+   - **Elastic Net** (Specificity: 1.0000) is ideal if avoiding false positives is the primary concern.
+
+5. **Simpler, Interpretable Models**:
+   - Stepwise models (**Step Forward**, **Step Backward**, and **Step Both**) perform almost as well as Full Logistic Regression but are simpler to interpret. These models balance Accuracy (0.9878), Sensitivity (0.9891), and Specificity (0.9767).
+
+---
+
+### Recommendations
+
+1. **Primary Recommendation**:
+   - **Elastic Net**: The best overall balance of metrics and ideal for applications where false positives are unacceptable.
+
+2. **Alternative Recommendation**:
+   - **Full Logistic Regression**: A close second with high interpretability and excellent metrics.
+
+3. **If Simplicity is Key**:
+   - **Stepwise Models**: These are great options for interpretable models with only a slight decrease in performance compared to Elastic Net and Full Logistic Regression.
+
+4. **Model Validation**:
+   - Validate Elastic Net and Full Logistic Regression on a separate validation dataset to ensure generalizability to unseen data.
+
+5. **Threshold Adjustment**:
+   - Adjust decision thresholds if prioritizing Sensitivity or Specificity for the application.
+
+This analysis provides a comprehensive view of the performance of all models, ensuring an informed choice based on project needs.
+
+
